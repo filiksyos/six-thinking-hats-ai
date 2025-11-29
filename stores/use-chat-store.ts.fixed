@@ -1,0 +1,112 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { Message, HatType } from "@/lib/types";
+
+interface ChatStore {
+  conversations: Record<HatType, Message[]>;
+  sharedInput: string;
+  isStreaming: Record<HatType, boolean>;
+  
+  setSharedInput: (input: string) => void;
+  addMessage: (hatType: HatType, message: Message) => void;
+  updateLastMessage: (hatType: HatType, content: string) => void;
+  setIsStreaming: (hatType: HatType, streaming: boolean) => void;
+  clearConversation: (hatType: HatType) => void;
+  clearAllConversations: () => void;
+  getSharedContext: () => Message[];
+}
+
+const initialConversations: Record<HatType, Message[]> = {
+  WHITE: [],
+  RED: [],
+  BLACK: [],
+  YELLOW: [],
+  GREEN: [],
+  BLUE: [],
+};
+
+const initialStreaming: Record<HatType, boolean> = {
+  WHITE: false,
+  RED: false,
+  BLACK: false,
+  YELLOW: false,
+  GREEN: false,
+  BLUE: false,
+};
+
+export const useChatStore = create<ChatStore>()(  persist(
+    (set, get) => ({
+      conversations: initialConversations,
+      sharedInput: "",
+      isStreaming: initialStreaming,
+
+      setSharedInput: (input) => set({ sharedInput: input }),
+
+      addMessage: (hatType, message) =>
+        set((state) => ({
+          conversations: {
+            ...state.conversations,
+            [hatType]: [...state.conversations[hatType], message],
+          },
+        })),
+
+      updateLastMessage: (hatType, content) =>
+        set((state) => {
+          const messages = [...state.conversations[hatType]];
+          if (messages.length > 0) {
+            messages[messages.length - 1] = {
+              ...messages[messages.length - 1],
+              content,
+            };
+          }
+          return {
+            conversations: {
+              ...state.conversations,
+              [hatType]: messages,
+            },
+          };
+        }),
+
+      setIsStreaming: (hatType, streaming) =>
+        set((state) => ({
+          isStreaming: {
+            ...state.isStreaming,
+            [hatType]: streaming,
+          },
+        })),
+
+      clearConversation: (hatType) =>
+        set((state) => ({
+          conversations: {
+            ...state.conversations,
+            [hatType]: [],
+          },
+        })),
+
+      clearAllConversations: () =>
+        set({
+          conversations: initialConversations,
+          sharedInput: "",
+        }),
+
+      // Get shared context from all hats for context awareness
+      getSharedContext: () => {
+        const state = get();
+        const allMessages: Message[] = [];
+        
+        // Collect all messages from all hats, sorted by timestamp
+        Object.values(state.conversations).forEach((hatMessages) => {
+          allMessages.push(...hatMessages);
+        });
+        
+        return allMessages.sort((a, b) => a.timestamp - b.timestamp);
+      },
+    }),
+    {
+      name: "six-hats-chat",
+      partialize: (state) => ({
+        conversations: state.conversations,
+      }),
+    }
+  )
+);
